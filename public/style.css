@@ -1,0 +1,56 @@
+/* Estilos globales */
+body {
+  font-family: 'Segoe UI', sans-serif;
+  background-color: #f8f9fa;
+  margin: 0;
+  padding: 0;
+}
+
+textarea {
+  font-family: monospace;
+  font-size: 14px;
+  resize: vertical;
+}
+
+/* Editores y salida TS con marco azul */
+.editor {
+  font-family: monospace;
+  height: 250px;
+  border: 2px solid #0d6efd; /* Azul Bootstrap */
+  border-radius: 4px;
+  resize: vertical;
+}
+
+/* Editor de solo lectura (salida TS) */
+textarea[readonly].editor {
+  background-color: #e9ecef;
+}
+
+/* Salida de consola */
+.console-output {
+  background: #fff;
+  border: 2px solid #0d6efd;
+  border-radius: 4px;
+  height: 100px;
+  overflow-y: auto;
+  padding: 8px;
+  font-family: monospace;
+  white-space: pre-wrap;
+}
+
+/* Títulos subrayados en azul */
+h5 {
+  border-bottom: 2px solid #0d6efd;
+  padding-bottom: 4px;
+  margin-bottom: 12px;
+}
+
+/* Espacio arriba del contenido de cada pestaña */
+.tab-pane {
+  margin-top: 20px;
+}
+
+/* Tamaño y espaciado para tablas */
+.table {
+  font-size: 0.9rem;
+}
