@@ -1,6 +1,6 @@
-// public/main.js
 (() => {
   const $ = id => document.getElementById(id);
+
   const inputText   = $("inputText");
   const outputText  = $("outputText");
   const analyzeBtn  = $("analyzeBtn");
@@ -10,25 +10,27 @@
   const tokensTb    = document.querySelector("#tokensTable tbody");
   const errorsTb    = document.querySelector("#errorsTable tbody");
   const consoleOut  = $("consoleOutput");
-  const symbolTb    = document.querySelector("#symbolTable tbody");
+  const symbolTb    = document.querySelector("#symbolTable tbody"); // opcional
 
   // Limpiar todo
   clearBtn.onclick = () => {
-    inputText.value   = "";
-    outputText.value  = "";
-    consoleOut.value  = "";
-    tokensTb.innerHTML  = "";
-    errorsTb.innerHTML  = "";
-    symbolTb.innerHTML  = "";
+    inputText.value    = "";
+    outputText.value   = "";
+    consoleOut.value   = "";
+    tokensTb.innerHTML = "";
+    errorsTb.innerHTML = "";
+    if (symbolTb) symbolTb.innerHTML = "";
   };
 
   // Cargar archivo .cs
   fileInput.accept = ".cs";
-  fileInput.onchange = e => {
+  fileInput.onchange = function (e) {
     const f = e.target.files[0];
     if (!f) return;
     const reader = new FileReader();
-    reader.onload = ev => inputText.value = ev.target.result;
+    reader.onload = function (ev) {
+      inputText.value = ev.target.result;
+    };
     reader.readAsText(f);
   };
 
@@ -50,25 +52,44 @@
     })
     .then(r => r.json())
     .then(d => {
-      // Código transpilado
-      outputText.value = d.transpiledCode;
+      console.log("📦 Respuesta completa:", d);
 
-      // Tokens y errores
-      populate(tokensTb, d.tokens, ["typeString", "lexeme", "row", "column"]);
-      populate(errorsTb, d.errors, ["typeString", "lexeme", "row", "column"]);
+      // Mostrar traducción en el área de salida
+      outputText.value = typeof d.transpiledCode === "string" ? d.transpiledCode : "";
 
-      // Salida de consola
-      consoleOut.value = d.consoleOutput;
+      // Llenar tablas
+      populate(tokensTb, d.tokens, ["typeTokenString", "lexeme", "row", "column"]);
+      const allErrors = [...(d.errors ?? []), ...(d.syntacticErrors ?? [])];
+      populate(errorsTb, allErrors, ["description", "lexeme", "row", "column"]);
 
-      // Tabla de símbolos
-      populate(symbolTb, d.symbols, ["name", "value", "row", "column"]);
+      if (symbolTb) {
+        populate(symbolTb, d.symbols, ["name", "value", "row", "column"]);
+      }
+
+      // Mostrar salida detallada en consola
+      if (typeof d.consoleOutput === "string") {
+        consoleOut.value = d.consoleOutput;
+      } else {
+        const fallback = allErrors.length > 0
+          ? `❌ Se encontraron ${allErrors.length} errores.\n\nVer tabla de errores para más detalles.`
+          : "✅ Análisis completado sin errores.\n\nCódigo transpilado correctamente.";
+        consoleOut.value = fallback;
+      }
     })
-    .catch(console.error);
+    .catch(err => {
+      console.error("❌ Error en la solicitud /analyze:", err);
+      consoleOut.value = "❌ Error al comunicarse con el servidor. ¿Está ejecutándose en localhost:3000?";
+    });
   };
 
-  // Función genérica para llenar tablas
+  // Función genérica para llenar tablas con validación
   function populate(tbody, arr, keys) {
     tbody.innerHTML = "";
+    if (!Array.isArray(arr)) {
+      console.warn("⚠️ No se recibió un arreglo para esta tabla:", tbody);
+      return;
+    }
+
     arr.forEach((obj, idx) => {
       const row = tbody.insertRow();
       row.insertCell().textContent = String(idx + 1);

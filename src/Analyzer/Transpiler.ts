@@ -25,9 +25,11 @@ export class Transpiler {
     private firsts: First[];
     private instructions: Instruction[];
     private countTab: number;
+    private symbols: { name: string; value: string | number | boolean; type: string; row: number; column: number }[];
 
     constructor(tokens: Token[]) {
         this.instructions = [];
+        this.symbols = [];
         this.errors = [];
         this.pos = 0;
         this.tokens = tokens;
@@ -49,6 +51,11 @@ export class Transpiler {
         this.preAnalysis = this.tokens[this.pos];
         this.countTab = 1;
     }
+
+    public getSymbolTable(): { name: string; value: string | number | boolean }[] {
+        return this.symbols;
+    }
+
 
     public parser() { // apilando nuestros no terminales T(p, , ) -> (q, blockUsing class)
         this.blockUsing();
@@ -492,4 +499,113 @@ export class Transpiler {
     public getInstructions(): Instruction[] {
         return this.instructions;
     }
+
+    public simulateConsoleOutput(): string[] {
+  const output: string[] = [];
+
+  const procesarInstruccion = (instr: Instruction) => {
+    if (instr instanceof Print) {
+      try {
+        let tsLine = instr.transpiler();
+        const match = tsLine.match(/console\.log\((.*)\);/i);
+
+        if (match) {
+          let expr = match[1];
+          const variablesUsadas = expr.match(/\b[a-zA-Z_][a-zA-Z0-9_]*\b/g) || [];
+
+          variablesUsadas.forEach(varName => {
+            const encontrado = this.symbols.find(s => s.name === varName);
+            const valorReemplazo = encontrado !== undefined
+              ? JSON.stringify(encontrado.value)
+              : '"⛔ sin valor"';
+            const regex = new RegExp(`\\b${varName}\\b`, "g");
+            expr = expr.replace(regex, valorReemplazo);
+          });
+
+          try {
+            const simulated = Function(`"use strict"; return (${expr})`)();
+            output.push(`[Línea ${instr.row}] ${String(simulated)}`);
+          } catch {
+            output.push(`[Línea ${instr.row}] ⚠️ Evaluación inválida: ${expr}`);
+          }
+        } else {
+          output.push(`[Línea ${instr.row}] ⚠️ No se pudo interpretar esta línea.`);
+        }
+      } catch {
+        output.push(`[Línea ${instr.row}] ⚠️ Error al evaluar una instrucción de impresión.`);
+      }
+    }
+
+    if (instr instanceof Declaration) {
+      for (const id of instr.getListIds()) {
+        const name = id.id instanceof Identifier ? id.id.getName() : "";
+        const value = id.value instanceof Primitive ? id.value.getValue() : "⛔ sin valor";
+        const row = id.id?.row ?? 0;
+        const column = id.id?.column ?? 0;
+        const type = value !== "⛔ sin valor" ? typeof value : "undefined";
+
+        if (name) {
+          const idx = this.symbols.findIndex(s => s.name === name);
+          if (idx >= 0) {
+            this.symbols[idx].value = value;
+          } else {
+            this.symbols.push({ name, value, type, row, column });
+          }
+        }
+      }
+    }
+
+    if (instr instanceof Assignation) {
+      const name = instr.getId();
+      const val = instr.getValue?.();
+      const value = val instanceof Primitive ? val.getValue() : "⛔ sin valor";
+      const row = instr.row;
+      const column = instr.column;
+      const type = value !== "⛔ sin valor" ? typeof value : "undefined";
+
+      if (name) {
+        const idx = this.symbols.findIndex(s => s.name === name);
+        if (idx >= 0) {
+          this.symbols[idx].value = value;
+        } else {
+          this.symbols.push({ name, value, type, row, column });
+        }
+      }
+    }
+
+    if (instr instanceof For) {
+      // Registrar init si es una asignación
+      if (instr["init"] instanceof Assignation) {
+        const init = instr["init"] as Assignation;
+        const name = init.getId();
+        const val = init.getValue?.();
+        const value = val instanceof Primitive ? val.getValue() : "⛔ sin valor";
+        const row = init.row;
+        const column = init.column;
+        const type = value !== "⛔ sin valor" ? typeof value : "undefined";
+
+        if (name) {
+          const idx = this.symbols.findIndex(s => s.name === name);
+          if (idx >= 0) this.symbols[idx].value = value;
+          else this.symbols.push({ name, value, type, row, column });
+        }
+      }
+
+      instr.getInstructions().forEach((sub: Instruction) => procesarInstruccion(sub));
+    }
+
+    if (instr instanceof If) {
+      instr.getInstructions().forEach((sub: Instruction) => procesarInstruccion(sub));
+      instr.getElseInstructions()?.forEach((sub: Instruction) => procesarInstruccion(sub));
+    }
+  };
+
+  for (const instr of this.instructions) {
+    procesarInstruccion(instr);
+  }
+
+  return output;
+}
+       
+    
 }
