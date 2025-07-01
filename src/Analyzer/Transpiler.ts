@@ -57,6 +57,52 @@ export class Transpiler {
     }
 
 
+    private evaluateExpression(expr: Instruction | undefined): any {
+  if (!expr) return "⛔ sin valor";
+
+  // Caso 1: Literal directo
+  if (expr instanceof Primitive) {
+    return expr.getValue();
+  }
+
+  // Caso 2: Variable (buscar en tabla de símbolos)
+  if (expr instanceof Identifier) {
+    const nombre = expr.getName();
+    const simbolo = this.symbols.find(s => s.name === nombre);
+    return simbolo !== undefined ? simbolo.value : "⛔ sin valor";
+  }
+
+  // Caso 3: Operaciones aritméticas
+  if ("exp1" in expr && "exp2" in expr && "operator" in expr) {
+     const izq = this.evaluateExpression((expr as any)["exp1"]);
+     const der = this.evaluateExpression((expr as any)["exp2"]);
+     const op  = expr["operator"];
+
+    if ([izq, der].includes("⛔ sin valor")) return "⛔ sin valor";
+
+    try {
+      switch (op) {
+        case "+": return izq + der;
+        case "-": return izq - der;
+        case "*": return izq * der;
+        case "/": return izq / der;
+        case "==": return izq == der;
+        case "!=": return izq != der;
+        case "<": return izq < der;
+        case "<=": return izq <= der;
+        case ">": return izq > der;
+        case ">=": return izq >= der;
+        default: return "⛔ sin valor";
+      }
+    } catch {
+      return "⛔ sin valor";
+    }
+  }
+
+  return "⛔ sin valor";
+}
+    
+
     public parser() { // apilando nuestros no terminales T(p, , ) -> (q, blockUsing class)
         this.blockUsing();
         this.class();
@@ -518,15 +564,20 @@ export class Transpiler {
             const valorReemplazo = encontrado !== undefined
               ? JSON.stringify(encontrado.value)
               : '"⛔ sin valor"';
+            const seguro = `(${valorReemplazo})`;
             const regex = new RegExp(`\\b${varName}\\b`, "g");
-            expr = expr.replace(regex, valorReemplazo);
+            expr = expr.replace(regex, seguro);
           });
 
-          try {
-            const simulated = Function(`"use strict"; return (${expr})`)();
-            output.push(`[Línea ${instr.row}] ${String(simulated)}`);
-          } catch {
-            output.push(`[Línea ${instr.row}] ⚠️ Evaluación inválida: ${expr}`);
+          if (expr.includes("⛔ sin valor")) {
+            output.push(`[Línea ${instr.row}] ⚠️ Valor no inicializado en: ${expr}`);
+          } else {
+            try {
+              const simulated = Function(`"use strict"; return (${expr})`)();
+              output.push(`[Línea ${instr.row}] ${String(simulated)}`);
+            } catch {
+              output.push(`[Línea ${instr.row}] ⚠️ Evaluación inválida: ${expr}`);
+            }
           }
         } else {
           output.push(`[Línea ${instr.row}] ⚠️ No se pudo interpretar esta línea.`);
@@ -539,7 +590,7 @@ export class Transpiler {
     if (instr instanceof Declaration) {
       for (const id of instr.getListIds()) {
         const name = id.id instanceof Identifier ? id.id.getName() : "";
-        const value = id.value instanceof Primitive ? id.value.getValue() : "⛔ sin valor";
+        const value = this.evaluateExpression(id.value);
         const row = id.id?.row ?? 0;
         const column = id.id?.column ?? 0;
         const type = value !== "⛔ sin valor" ? typeof value : "undefined";
@@ -558,7 +609,7 @@ export class Transpiler {
     if (instr instanceof Assignation) {
       const name = instr.getId();
       const val = instr.getValue?.();
-      const value = val instanceof Primitive ? val.getValue() : "⛔ sin valor";
+      const value = this.evaluateExpression(val);
       const row = instr.row;
       const column = instr.column;
       const type = value !== "⛔ sin valor" ? typeof value : "undefined";
@@ -574,12 +625,12 @@ export class Transpiler {
     }
 
     if (instr instanceof For) {
-      // Registrar init si es una asignación
+      // Registrar init si es asignación
       if (instr["init"] instanceof Assignation) {
         const init = instr["init"] as Assignation;
         const name = init.getId();
         const val = init.getValue?.();
-        const value = val instanceof Primitive ? val.getValue() : "⛔ sin valor";
+        const value = this.evaluateExpression(val);
         const row = init.row;
         const column = init.column;
         const type = value !== "⛔ sin valor" ? typeof value : "undefined";
