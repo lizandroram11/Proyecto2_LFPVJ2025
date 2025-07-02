@@ -32,6 +32,18 @@
     line-height: 1rem;
 }
 
+#console {
+    text-align: start;
+    background: #2d2d2d;
+    border: 1px solid #555;
+    padding: 10px;
+    height: 25vh;
+    white-space: pre-wrap;
+    outline: none;
+    overflow-y: auto;
+    line-height: 1rem;
+}
+
 .text {
     color: #f6f6f6;
     text-align: start;

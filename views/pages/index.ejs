@@ -26,6 +26,13 @@
                 <h1>Salida Traducida</h1>
                 <%- include('../partials/editor', {id: 'salida' , editable: false}); %>
             </div>
+             <div class="col">
+                <h2>Salida de consola</h2>
+            <textarea id="consoleOutput" rows="10" style="width:100%;" readonly></textarea>
+            </div>
+              <!-- Agrega esto justo después de la tabla de símbolos -->
+            
+
         </div>
         <div class="row justify-content-center">
             <button id="analyze" class="btn btn-primary btn_user">

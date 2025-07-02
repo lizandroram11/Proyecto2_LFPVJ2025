@@ -1,3 +1,4 @@
+
 import { Instruction } from "../abstract/Instruction";
 
 export class Print implements Instruction {
